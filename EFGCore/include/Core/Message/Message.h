@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <Core/Message/Instrument.h>
 #include <Core/MarketUtils/MarketUtils.h>
+#include <Core/CommonUtils/Utils.h>
 #include <Core/Data/String/FixedString.h>
 
 using namespace EFG::Core::Data;

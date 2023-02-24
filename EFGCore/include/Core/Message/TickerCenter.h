@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Message/Message.h>
+#include <Core/Message/EventCenter.h>
 
 namespace EFG
 {
@@ -9,30 +10,21 @@ namespace Core
 namespace Message
 {
 
-inline constexpr size_t getNextPowerOftwo(size_t n)
-{
-    n--;
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
-    n++;
-    return n;
-}
-
 template<typename SamplingTimePeriod, typename TimeHorizon = TimeUnits::Hours<12>, bool Sampled=false>
-class TickerCenter
+class TickerCenter : public EventCenter<Ticker, 
+                                         Utils::getNextPowerOftwo(TimeHorizon::Units/SamplingTimePeriod::Units)>
 {
 public:
   using SamplingTime = SamplingTimePeriod;
-  static const constexpr size_t mSamples = getNextPowerOftwo(TimeHorizon::Units/SamplingTime::Units);
+  using EventType    = Ticker;
+  static const constexpr size_t mSamples = Utils::getNextPowerOftwo(TimeHorizon::Units/SamplingTime::Units);
   using TickersType = RingBuffer<Core::Message::Ticker, mSamples>; 
+  using Base = EventCenter<EventType,mSamples>;
   void onEvent(const Trade& trade, const DepthBook& lastDepth)
   {
     uint64_t ts = trade.apiIncomingTime;
-    auto it = mBuffer.find(trade.mInstrumentId);
-    if(it!=mBuffer.end())
+    auto it = Base::mBuffer.find(trade.mInstrumentId);
+    if(it!=Base::mBuffer.end())
     {
       auto& tickers = *(it->second);
       auto& last_ticker = tickers.peek();
@@ -126,14 +118,14 @@ public:
         }
       }
       new_tickers->insert(ticker);
-      mBuffer.insert({trade.mInstrumentId, std::move(new_tickers)});
+      Base::mBuffer.insert({trade.mInstrumentId, std::move(new_tickers)});
     } 
   } 
   void onEvent(const AggregateTrade& trade)
   {
     uint64_t ts = trade.apiIncomingTime;
-    auto it = mBuffer.find(trade.mInstrumentId);
-    if(it!=mBuffer.end())
+    auto it = Base::mBuffer.find(trade.mInstrumentId);
+    if(it!=Base::mBuffer.end())
     {
       auto& tickers = *(it->second);
       auto& last_ticker = tickers.peek();
@@ -186,14 +178,14 @@ public:
       ticker.apiIncomingTime = ts;
       new_tickers->mLastUpdateTime  = ts;
       new_tickers->insert(ticker);
-      mBuffer.insert({trade.mInstrumentId, std::move(new_tickers)});
+      Base::mBuffer.insert({trade.mInstrumentId, std::move(new_tickers)});
     } 
   } 
   void onEvent(const Ticker& ticker)
   {
     uint64_t ts = ticker.apiIncomingTime;
-    auto it = mBuffer.find(ticker.mInstrumentId);
-    if(it!=mBuffer.end())
+    auto it = Base::mBuffer.find(ticker.mInstrumentId);
+    if(it!=Base::mBuffer.end())
     {
       auto& tickers = *(it->second);
       tickers.insert(ticker);
@@ -202,63 +194,9 @@ public:
     {
       auto new_tickers = std::make_unique<RingBuffer<Ticker, mSamples>>();
       new_tickers->insert(ticker);
-      mBuffer.insert({ticker.mInstrumentId, std::move(new_tickers)});
+      Base::mBuffer.insert({ticker.mInstrumentId, std::move(new_tickers)});
     } 
   } 
-  template<typename F>
-  void visit(const InstrumentId& id, size_t N, F&& f) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      (it->second)->visit(N, f);        
-    } 
-  }
-  template<typename F>
-  void rvisit(const InstrumentId& id, size_t N, F&& f) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      (it->second)->rvisit(N, f);        
-    } 
-  }
-  template<typename F, typename PRED>
-  void rvisit(const InstrumentId& id, PRED& pred, F&& f) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      (it->second)->rvisit(pred, f);        
-    } 
-  }
-  template<typename PRED>
-  size_t visitWindowSize(const InstrumentId& id, PRED& pred) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      return (it->second)->visitWindowSize(pred);        
-    }
-    return 0; 
-  }
-  const size_t size(const InstrumentId& id) const
-  {
-    auto it = mBuffer.find(id);
-    return it!=mBuffer.end() ? (it->second)->size() : 0;
-  }
-  Ticker& peek(const InstrumentId& id, size_t window) const
-  {
-    auto it = mBuffer.find(id);
-    return (it->second)->peek(window);
-  }	  
-  Ticker& peek(const InstrumentId& id) const
-  {
-    auto it = mBuffer.find(id);
-    return (it->second)->peek();
-  }	  
-private:
-  std::unordered_map<InstrumentId, std::unique_ptr<RingBuffer<Ticker, mSamples>>, InstrumentIdHash> mBuffer;
 }; 
 
 

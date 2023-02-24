@@ -16,6 +16,19 @@ static const constexpr int64_t multipliers[]=
   10000000000, 100000000000,1000000000000
 };
 
+
+inline constexpr size_t getNextPowerOftwo(size_t n)
+{
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
+
 inline double toDouble(const char* _str)
 {
   int64_t value = 0;

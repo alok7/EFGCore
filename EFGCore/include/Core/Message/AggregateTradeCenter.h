@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Message/Message.h>
+#include <Core/Message/EventCenter.h>
 
 namespace EFG
 {
@@ -9,25 +10,16 @@ namespace Core
 namespace Message
 {
 
-inline constexpr size_t _getNextPowerOftwo(size_t n)
-{
-    n--;
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
-    n++;
-    return n;
-}
-
 template<typename SamplingTimePeriod, typename TimeHorizon = TimeUnits::Hours<12>, bool Sampled=false>
-class AggregateTradeCenter
+class AggregateTradeCenter : public EventCenter<AggregateTrade, 
+                                                 Utils::getNextPowerOftwo(TimeHorizon::Units/SamplingTimePeriod::Units)>
 {
 public:
   using SamplingTime = SamplingTimePeriod;
-  static const constexpr size_t mSamples = _getNextPowerOftwo(TimeHorizon::Units/SamplingTime::Units);
+  using EventType    = AggregateTrade;
+  static const constexpr size_t mSamples = Utils::getNextPowerOftwo(TimeHorizon::Units/SamplingTime::Units);
   using AggregateTradeType = RingBuffer<Core::Message::AggregateTrade, mSamples>; 
+  using Base = EventCenter<EventType,mSamples>;
   void onEvent(const Trade& trade, double bidPrice, double askPrice)
   {
     Core::Message::Ticker ticker;
@@ -38,8 +30,8 @@ public:
   void onEvent(const AggregateTrade& aggTrade)
   {
     uint64_t ts = aggTrade.apiIncomingTime;
-    auto it = mBuffer.find(aggTrade.mInstrumentId);
-    if(it!=mBuffer.end())
+    auto it = Base::mBuffer.find(aggTrade.mInstrumentId);
+    if(it!=Base::mBuffer.end())
     {
       auto& aggTrades = *(it->second);
       auto& last_aggTrade = aggTrades.peek();
@@ -82,15 +74,15 @@ public:
       new_aggTrades->mLastUpdateTime  = ts;
       mDuration = 0;
       new_aggTrades->insert(aggTrade);
-      mBuffer.insert({aggTrade.mInstrumentId, std::move(new_aggTrades)});
+      Base::mBuffer.insert({aggTrade.mInstrumentId, std::move(new_aggTrades)});
     } 
     mLastTradeUpdateTime = ts;
   }
   void onEvent(const Trade& trade, const Ticker& ticker)
   {
     uint64_t ts = trade.apiIncomingTime;
-    auto it = mBuffer.find(trade.mInstrumentId);
-    if(it!=mBuffer.end())
+    auto it = Base::mBuffer.find(trade.mInstrumentId);
+    if(it!=Base::mBuffer.end())
     {
       auto& aggTrades = *(it->second);
       auto& last_aggTrade = aggTrades.peek();
@@ -184,64 +176,11 @@ public:
         }
       }
       new_aggTrades->insert(aggTrade);
-      mBuffer.insert({trade.mInstrumentId, std::move(new_aggTrades)});
+      Base::mBuffer.insert({trade.mInstrumentId, std::move(new_aggTrades)});
     } 
     mLastTradeUpdateTime = ts;
   } 
-  template<typename F>
-  void visit(const InstrumentId& id, size_t N, F&& f) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      (it->second)->visit(N, f);        
-    } 
-  }
-  template<typename F>
-  void rvisit(const InstrumentId& id, size_t N, F&& f) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      (it->second)->rvisit(N, f);        
-    } 
-  }
-  template<typename F, typename PRED>
-  void rvisit(const InstrumentId& id, PRED& pred, F&& f) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      (it->second)->rvisit(pred, f);        
-    } 
-  }
-  template<typename PRED>
-  size_t visitWindowSize(const InstrumentId& id, PRED& pred) const
-  {
-    auto it = mBuffer.find(id);
-    if(it!=mBuffer.end())
-    {
-      return (it->second)->visitWindowSize(pred);        
-    }
-    return 0; 
-  }
-  const size_t size(const InstrumentId& id) const
-  {
-    auto it = mBuffer.find(id);
-    return it!=mBuffer.end() ? (it->second)->size() : 0;
-  }
-  AggregateTrade& peek(const InstrumentId& id) const
-  {
-    auto it = mBuffer.find(id);
-    return (it->second)->peek();
-  }	  
-  AggregateTrade& peek(const InstrumentId& id, size_t window) const
-  {
-    auto it = mBuffer.find(id);
-    return (it->second)->peek(window);
-  }	  
 private:
-  std::unordered_map<InstrumentId, std::unique_ptr<RingBuffer<AggregateTrade, mSamples>>, InstrumentIdHash> mBuffer;
   uint64_t mLastTradeUpdateTime = 0;
   uint64_t mDuration = 0;
 }; 
