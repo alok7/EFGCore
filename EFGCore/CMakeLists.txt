@@ -30,6 +30,7 @@ set(${PROJECT_NAME}_SRC
             src/Core/Message/TickerCenter.cpp
 	    src/Core/Message/PriceDepthCenter.cpp
 	    src/Core/Message/AggregateTradeCenter.cpp
+	    src/Core/Lock/SpinLock.cpp
             )
 
 add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SRC} )
