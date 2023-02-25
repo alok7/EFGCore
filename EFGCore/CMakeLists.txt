@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(EFGCore LANGUAGES CXX)
-set(EXECUTABLE ${PROJECT_NAME}-bin)
 include(CMakePackageConfigHelpers)
 # make cache variables for install destinations
 include(GNUInstallDirs)
@@ -34,41 +33,29 @@ set(${PROJECT_NAME}_SRC
             )
 
 add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SRC} )
-add_executable(${EXECUTABLE} ${${PROJECT_NAME}_SRC}  Tests/Test.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:${PROJECT_NAME}/${CMAKE_INSTALL_INCLUDEDIR}>"
                                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_include_directories(${EXECUTABLE} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:${PROJECT_NAME}/${CMAKE_INSTALL_INCLUDEDIR}>"
-                                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
-target_link_libraries(${EXECUTABLE} PRIVATE Threads::Threads)
 
 find_package(CURL REQUIRED)
 target_include_directories(${PROJECT_NAME} PRIVATE ${CURL_INCLUDE_DIRS})
-target_include_directories(${EXECUTABLE} PRIVATE ${CURL_INCLUDE_DIRS})
 target_link_Libraries(${PROJECT_NAME} PRIVATE ${CURL_LIBRARIES})
-target_link_Libraries(${EXECUTABLE} PRIVATE ${CURL_LIBRARIES})
 
 find_package(OpenSSL REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
-target_link_libraries(${EXECUTABLE} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
 #find_package(ZLIB REQUIRED)
 #target_include_directories(${PROJECT_NAME} PRIVATE ${ZLIB_INCLUDE_DIRS})
-#target_include_directories(${EXECUTABLE} PRIVATE ${ZLIB_INCLUDE_DIRS})
 #target_link_Libraries(${PROJECT_NAME} PRIVATE ${ZLIB_LIBRARIES})
-#target_link_Libraries(${EXECUTABLE} PRIVATE ${ZLIB_LIBRARIES})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE uWS)
-target_link_libraries(${EXECUTABLE} PRIVATE uWS)
 target_include_directories(${PROJECT_NAME} PRIVATE "/usr/include/uWS")
-target_include_directories(${EXECUTABLE} PRIVATE "/usr/include/uWS")
 
 target_link_libraries(${PROJECT_NAME} PUBLIC rt)
-target_link_libraries(${EXECUTABLE} PUBLIC rt)
 
 install(TARGETS ${PROJECT_NAME}
         EXPORT ${PROJECT_NAME}_TARGETS

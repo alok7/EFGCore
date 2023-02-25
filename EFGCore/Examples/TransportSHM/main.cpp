@@ -2,16 +2,6 @@
 #include <Core/Transport/SHM/Publisher.h>
 #include <Core/Transport/SHM/Subscriber.h>
 
-class Application
-{
- public:
-   void runTests()
-   {
-
-   }
-
-};
-
 struct EventA
 {
   const static size_t mId = 1;
